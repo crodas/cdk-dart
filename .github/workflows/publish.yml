@@ -30,9 +30,6 @@ jobs:
             artifact: libcdk_ffi_dart.so
 
           # macOS
-          - target: x86_64-apple-darwin
-            runner: macos-13
-            artifact: libcdk_ffi_dart.dylib
           - target: aarch64-apple-darwin
             runner: macos-14
             artifact: libcdk_ffi_dart.dylib
