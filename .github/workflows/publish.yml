@@ -148,24 +148,41 @@ jobs:
           name: generated-dart
           path: ./generated-dart
 
-      - name: Package release
+      - name: Package per-platform zips
         run: |
-          mkdir -p release/native
+          mkdir -p release
 
-          # Move all native libs into release/native/
-          mv artifacts/* release/native/
+          # For each native artifact, create a zip bundling the native lib + generated dart
+          for f in artifacts/*; do
+            filename=$(basename "$f")
+            # filename is like: aarch64-apple-darwin-libcdk_ffi_dart.dylib
+            # Strip known artifact names to extract the target triple
+            for suffix in libcdk_ffi_dart.so libcdk_ffi_dart.dylib libcdk_ffi_dart.a cdk_ffi_dart.dll; do
+              if [[ "$filename" == *"-${suffix}" ]]; then
+                target="${filename%-${suffix}}"
+                native_file="${suffix}"
+                break
+              fi
+            done
 
-          # Copy generated Dart sources
-          mkdir -p release/lib/src/generated
-          cp -r generated-dart/* release/lib/src/generated/
+            # Create platform directory
+            pkg_dir="pkg-${target}"
+            mkdir -p "${pkg_dir}/lib/src/generated"
 
-          # Create checksums
-          cd release/native
-          sha256sum * > SHA256SUMS
-          cd ../..
+            # Copy native library (original name without target prefix)
+            cp "$f" "${pkg_dir}/${native_file}"
 
-          # Create tarball of all native libs
-          tar -czf release/native-libs.tar.gz -C release/native .
+            # Copy generated Dart sources
+            cp -r generated-dart/* "${pkg_dir}/lib/src/generated/"
+
+            # Create zip
+            (cd "${pkg_dir}" && zip -r "../release/cdk-dart-${target}.zip" .)
+            rm -rf "${pkg_dir}"
+          done
+
+          # Create checksums for all zips
+          cd release
+          sha256sum *.zip > SHA256SUMS
 
       - name: Determine tag
         id: tag
@@ -185,10 +202,7 @@ jobs:
             --generate-notes \
             2>/dev/null || true
 
-          # Upload native libraries individually
-          for f in release/native/*; do
+          # Upload per-platform zips and checksums
+          for f in release/*.zip release/SHA256SUMS; do
             gh release upload "$TAG" "$f" --clobber
           done
-
-          # Upload the combined tarball
-          gh release upload "$TAG" release/native-libs.tar.gz --clobber
