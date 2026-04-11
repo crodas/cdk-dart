@@ -1,16 +1,11 @@
 name: Build & Publish Dart Bindings
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - 'rust/**'
-      - 'pubspec.yaml'
   workflow_dispatch:
     inputs:
       release_tag:
-        description: 'Tag to create for release (e.g. v0.17.0). Leave empty to just update prebuilt binaries.'
-        required: false
+        description: 'Tag to create for release (e.g. v0.17.0)'
+        required: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -173,7 +168,6 @@ jobs:
           git push
 
       - name: Create tag and release
-        if: inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
