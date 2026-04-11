@@ -75,6 +75,17 @@ jobs:
         working-directory: rust
         run: cross build --release --target ${{ matrix.target }}
 
+      - name: Strip debug symbols
+        shell: bash
+        run: |
+          FILE="rust/target/${{ matrix.target }}/release/${{ matrix.artifact }}"
+          case "${{ matrix.target }}" in
+            *windows*)  strip --strip-all "$FILE" ;;
+            *apple*)    strip -S "$FILE" ;;
+            *android*)  "$ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-all "$FILE" ;;
+            *)          strip --strip-all "$FILE" ;;
+          esac
+
       - name: Prepare artifact
         shell: bash
         run: |
