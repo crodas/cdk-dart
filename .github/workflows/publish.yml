@@ -1,14 +1,16 @@
-name: Publish Dart Bindings
+name: Build & Publish Dart Bindings
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [master]
+    paths:
+      - 'rust/**'
+      - 'pubspec.yaml'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to build (e.g. v0.16.0)'
-        required: true
+      release_tag:
+        description: 'Tag to create for release (e.g. v0.17.0). Leave empty to just update prebuilt binaries.'
+        required: false
 
 env:
   CARGO_TERM_COLOR: always
@@ -58,8 +60,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -99,8 +99,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -123,8 +121,8 @@ jobs:
           name: generated-dart
           path: lib/src/generated/
 
-  release:
-    name: "Create GitHub Release"
+  commit-and-release:
+    name: "Commit prebuilt & optionally release"
     runs-on: ubuntu-latest
     needs: [build-native, generate-bindings]
     permissions:
@@ -133,7 +131,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
+          ref: master
 
       - name: Download all native artifacts
         uses: actions/download-artifact@v4
@@ -146,63 +144,42 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: generated-dart
-          path: ./generated-dart
+          path: ./lib/src/generated/
 
-      - name: Package per-platform zips
+      - name: Organize prebuilt binaries
         run: |
-          mkdir -p release
+          rm -rf prebuilt
+          mkdir -p prebuilt
 
-          # For each native artifact, create a zip bundling the native lib + generated dart
           for f in artifacts/*; do
             filename=$(basename "$f")
-            # filename is like: aarch64-apple-darwin-libcdk_ffi_dart.dylib
-            # Strip known artifact names to extract the target triple
             for suffix in libcdk_ffi_dart.so libcdk_ffi_dart.dylib libcdk_ffi_dart.a cdk_ffi_dart.dll; do
               if [[ "$filename" == *"-${suffix}" ]]; then
                 target="${filename%-${suffix}}"
-                native_file="${suffix}"
+                mkdir -p "prebuilt/${target}"
+                cp "$f" "prebuilt/${target}/${suffix}"
                 break
               fi
             done
-
-            # Create platform directory
-            pkg_dir="pkg-${target}"
-            mkdir -p "${pkg_dir}/lib/src/generated"
-
-            # Copy native library (original name without target prefix)
-            cp "$f" "${pkg_dir}/${native_file}"
-
-            # Copy generated Dart sources
-            cp -r generated-dart/* "${pkg_dir}/lib/src/generated/"
-
-            # Create zip
-            (cd "${pkg_dir}" && zip -r "../release/cdk-dart-${target}.zip" .)
-            rm -rf "${pkg_dir}"
           done
 
-          # Create checksums for all zips
-          cd release
-          sha256sum *.zip > SHA256SUMS
-
-      - name: Determine tag
-        id: tag
+      - name: Commit and push
         run: |
-          TAG="${{ github.event.inputs.tag || github.ref_name }}"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add prebuilt/ lib/src/generated/
+          git diff --cached --quiet && echo "No changes to commit" && exit 0
+          git commit -m "ci: update prebuilt binaries and generated bindings [skip ci]"
+          git push
 
-      - name: Create release
+      - name: Create tag and release
+        if: inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="${{ steps.tag.outputs.tag }}"
-
-          # Create release if it doesn't exist
+          TAG="${{ inputs.release_tag }}"
+          git tag "$TAG"
+          git push origin "$TAG"
           gh release create "$TAG" \
             --title "Release $TAG" \
-            --generate-notes \
-            2>/dev/null || true
-
-          # Upload per-platform zips and checksums
-          for f in release/*.zip release/SHA256SUMS; do
-            gh release upload "$TAG" "$f" --clobber
-          done
+            --generate-notes
