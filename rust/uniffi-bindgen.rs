@@ -45,7 +45,13 @@ fn main() {
     .expect("Failed to generate dart bindings");
 
     // Post-generation patching to fix uniffi-dart codegen issues
-    let generated_path = out_dir.join("cdk_ffi.dart");
+    // Find the generated .dart file — the name depends on the UDL namespace
+    let generated_path = std::fs::read_dir(out_dir)
+        .expect("Failed to read output directory")
+        .filter_map(|e| e.ok())
+        .map(|e| camino::Utf8PathBuf::try_from(e.path()).expect("Invalid UTF-8 in path"))
+        .find(|p| p.extension() == Some("dart"))
+        .expect("No .dart file found in output directory after generation");
     patch_generated(&generated_path);
 }
 
