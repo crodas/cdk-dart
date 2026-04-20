@@ -40,7 +40,7 @@ Supported targets:
 | Platform | Architecture |
 |----------|-------------|
 | Linux | x86_64, aarch64 |
-| macOS | x86_64, aarch64 |
+| macOS | aarch64 |
 | Windows | x86_64 |
 | Android | aarch64, armv7, x86_64 |
 | iOS | aarch64 |
