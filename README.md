@@ -11,13 +11,12 @@ dependencies:
   cdk:
     git:
       url: https://github.com/cashubtc/cdk-dart
-      ref: v0.19.0  # replace with desired version
+      ref: v12.12.12  # replace with desired version
 ```
 
 ## Requirements
 
 - Dart SDK `^3.10.0`
-- Rust toolchain (the native library is compiled from source via [native_toolchain_rust](https://pub.dev/packages/native_toolchain_rust))
 
 ## Usage
 
@@ -25,25 +24,28 @@ dependencies:
 import 'package:cdk/cdk.dart';
 ```
 
-## Building
+## Native library
 
-The Rust native library is built automatically when you run `dart pub get` or `dart run`. No manual compilation step is needed.
-
-If you're in a Nix environment, OpenSSL paths are detected automatically from `NIX_CFLAGS_COMPILE` and `NIX_LDFLAGS`.
-
-## Pre-built binaries
-
-Pre-built native libraries for all supported platforms are available as [GitHub release assets](https://github.com/cashubtc/cdk-dart/releases).
+There is no compilation step, no Rust toolchain and no network access involved.
+The native libraries are committed in this package under
+`prebuilt/<target-triple>/`, and the build hook copies the one matching your
+target. They are built from the CDK monorepo at the commit this version was
+tagged from, so the binary and the Dart bindings always come from one tree.
 
 Supported targets:
 
 | Platform | Architecture |
 |----------|-------------|
 | Linux | x86_64, aarch64 |
-| macOS | aarch64 |
+| macOS | aarch64, x86_64 |
 | Windows | x86_64 |
 | Android | aarch64, armv7, x86_64 |
 | iOS | aarch64 |
+
+Each target ships the flavour Dart asks for on that platform: dynamic
+everywhere except iOS, which is statically linked. A target or link mode with no
+committed library fails the build naming what it wanted, because this package
+ships no Rust sources to fall back to.
 
 ## CI/CD — Publishing Workflow
 
