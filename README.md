@@ -11,7 +11,7 @@ dependencies:
   cdk:
     git:
       url: https://github.com/cashubtc/cdk-dart
-      ref: v13.13.13  # replace with desired version
+      ref: v0.18.0-nightly.20260928.g7b4e2fd  # replace with desired version
 ```
 
 ## Requirements
